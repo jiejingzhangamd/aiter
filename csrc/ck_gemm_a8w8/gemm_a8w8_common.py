@@ -60,7 +60,7 @@ class kernelInstance:
 
 
 @dataclass
-class TileKernelInstance:
+class tileKernelInstance:
     M_Tile: int
     N_Tile: int
     K_Tile: int
@@ -241,7 +241,11 @@ default_kernels_dict = {
 }
 
 kernels_list_cktile = {
-    0:  TileKernelInstance(   128,     128,      128,     1,        4,       1,        16,            16,           64,      "Intrawave",        False,             True,           False,             1      ),
+    0:  tileKernelInstance(   128,     128,      128,     1,        4,       1,        16,            16,           64,      "Intrawave",        False,             True,           False,             1      ),
+}
+
+default_kernels_dict_cktile = {
+    (-1):  tileKernelInstance(   128,     128,      128,     1,        4,       1,        16,            16,           64,      "Intrawave",        False,             True,           False,             1      ),
 }
 
 # fmt: on

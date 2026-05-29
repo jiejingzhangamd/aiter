@@ -102,7 +102,6 @@ def gemm_a8w8_ref(x, weight, x_scale, w_scale, dtype=dtypes.bf16, q_dtype_w=dtyp
 
 
 def run_gemm_a8w8(x, weight, x_scale, w_scale, out, kernelId, splitK):
-
     aiter.gemm_a8w8_tune(x, weight, x_scale, w_scale, out, kernelId, splitK)
     return out
 
@@ -310,7 +309,6 @@ class GemmA8W8Tuner(GemmCommonTuner):
                     total_kernel_nums = total_kernel_nums + 1
 
             tasks_data.append((total_kernel_nums, ()))
-        print(task)
 
         ret = []
         if task:

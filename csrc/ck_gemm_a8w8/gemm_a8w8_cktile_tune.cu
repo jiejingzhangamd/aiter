@@ -2,8 +2,8 @@
 // Copyright (C) 2026, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "gemm_a8w8_common.cuh"
-#include "gemm_a8w8_manifest.h"
-#include "gemm_a8w8_lookup.h"
+#include "gemm_a8w8_cktile_manifest.h"
+#include "gemm_a8w8_cktile_lookup.h"
 #include <string>
 #include "py_itfs_common.h"
 
