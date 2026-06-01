@@ -732,7 +732,7 @@ namespace py = pybind11;
           py::arg("bias")   = std::nullopt, \
           py::arg("splitK") = 0);
 
-#define GEMM_A8W8_TUNE_CKTILE_PYBIND \
+#define GEMM_A8W8_CKTILE_TUNE_PYBIND \
     m.def("gemm_a8w8_cktile_tune",   \
           &gemm_a8w8_cktile_tune,    \
           "gemm_a8w8_cktile_tune",   \

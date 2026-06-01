@@ -94,7 +94,7 @@ class tileKernelInstance:
         """
 
         parts = [
-            "a8w8_blockscale_cktile",
+            "a8w8_cktile",
             ("x").join(
                 map(
                     lambda x: str(x),

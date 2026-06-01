@@ -86,7 +86,7 @@ class gemm_a8w8_fwd_codegen:
 
 #include "gemm_a8w8_cktile_common.cuh"
 
-template <typename DDataType, typename EDataType>
+template <typename ABDataType, typename DDataType, typename EDataType = DDataType>
 torch::Tensor
 {k.name}(
     torch::Tensor &XQ,
@@ -94,7 +94,8 @@ torch::Tensor
     torch::Tensor &x_scale,
     torch::Tensor &w_scale,
     torch::Tensor &Y,
-    bool preshuffleB,
+    std::optional<torch::Tensor> bias,
+    // bool preshuffleB,
     int k_batch
     )
 {{
@@ -121,8 +122,9 @@ torch::Tensor
             {k.BlockPerCu},
             {str(k.AQRowMajor).lower()}>;
 
-        // Run kernel instance.
-        return gemm_a8w8_cktile_impl<DDataType, EDataType, TileGemmInstance>(XQ, WQ, x_scale, w_scale, Y, preshuffleB, k_batch);
+    // Run kernel instance.
+    // return gemm_a8w8_cktile_impl<ABDataType, DDataType, EDataType, TileGemmInstance>(XQ, WQ, x_scale, w_scale, Y, preshuffleB, k_batch);
+    return gemm_a8w8_cktile_impl<ABDataType, DDataType, EDataType, TileGemmInstance>(XQ, WQ, x_scale, w_scale, Y, bias, k_batch);
 """
 
         TILE_INSTANCE_IMPL_str = TILE_INSTANCE_IMPL.replace(
@@ -149,22 +151,22 @@ template torch::Tensor
     int KBatch);
 
 """
-        # Generate both I8 and F8 instances for tuning
-        # I8 instances
-        for EDtype in ["B16"]:
-            INSTANCE_abI8 = INSTANCE_template.format(
-                name=k.name, dtypes=f"I8, B16, {EDtype}"
-            )
-            Path(
-                os.path.join(
-                    self.instances_path, f"{k.name}_abI8_dB16_e{EDtype}.cpp"
-                )
-            ).write_text(INSTANCE_abI8)
+        # # Generate both I8 and F8 instances for tuning
+        # # I8 instances
+        # for EDtype in ["TILE_BF16"]:
+        #     INSTANCE_abI8 = INSTANCE_template.format(
+        #         name=k.name, dtypes=f"TILE_I8, TILE_BF16, {EDtype}"
+        #     )
+        #     Path(
+        #         os.path.join(
+        #             self.instances_path, f"{k.name}_abI8_dB16_e{EDtype}.cpp"
+        #         )
+        #     ).write_text(INSTANCE_abI8)
 
         # F8 instances
-        for EDtype in ["B16"]:
+        for EDtype in ["TILE_BF16"]:
             INSTANCE_abF8 = INSTANCE_template.format(
-                name=k.name, dtypes=f"F8, F32, {EDtype}"
+                name=k.name, dtypes=f"TILE_FP8, TILE_FP32, {EDtype}"
             )
             Path(
                 os.path.join(
