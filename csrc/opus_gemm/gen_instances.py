@@ -27,22 +27,31 @@ from opus_gemm_common import (
 
 # Paired W3 kernels (nosplit_tag -> splitk_tag) share one <Traits, Kargs> template.
 W3_KERNEL_PAIRS = {
-    "a16w16_kbuf3":       "a16w16_kbuf3_sk",
-    "a16w16_kbuf2v":       "a16w16_kbuf2v_sk",
+    "a16w16_kbuf3": "a16w16_kbuf3_sk",
+    "a16w16_kbuf2v": "a16w16_kbuf2v_sk",
     "a16w16_kbuf2v_bk128": "a16w16_kbuf2v_bk128_sk",
-    "a16w16_kbuf1":   "a16w16_kbuf1_sk",
+    "a16w16_kbuf1": "a16w16_kbuf1_sk",
 }
-_NOSPLIT  = tuple(W3_KERNEL_PAIRS.keys())
-_SPLITK   = tuple(W3_KERNEL_PAIRS.values())
-_GFX942_A16W16_TAGS = _SPLITK + ("a16w16_fused_reduce", "a16w16_kbuf1_large_tile") + _NOSPLIT
+_NOSPLIT = tuple(W3_KERNEL_PAIRS.keys())
+_SPLITK = tuple(W3_KERNEL_PAIRS.values())
+_GFX942_A16W16_TAGS = (
+    _SPLITK + ("a16w16_fused_reduce", "a16w16_kbuf1_large_tile") + _NOSPLIT
+)
 _A16W16_TAGS = (
-    "a16w16", "a16w16_flatmm", "a16w16_flatmm_splitk", "a16w16_persistent",
+    "a16w16",
+    "a16w16_flatmm",
+    "a16w16_flatmm_splitk",
+    "a16w16_persistent",
     "a16w16_mono_tile",
 ) + _GFX942_A16W16_TAGS
 
+
 # gfx942 pipeline header derived from W3_KERNEL_PAIRS: splitk_X reuses
 # nosplit_X's .cuh (paired template); splitk_fused has its own.
-_gfx942_pipeline = lambda tag: f"gfx942/opus_gemm_pipeline_{tag}.cuh"
+def _gfx942_pipeline(tag):
+    return f"gfx942/opus_gemm_pipeline_{tag}.cuh"
+
+
 PIPELINE_HEADER_MAP = {
     "a8w8_scale": "gfx950/opus_gemm_pipeline_a8w8_scale_gfx950.cuh",
     "a8w8": "gfx950/opus_gemm_pipeline_a8w8_noscale_gfx950.cuh",
@@ -54,9 +63,13 @@ PIPELINE_HEADER_MAP = {
     "a16w16_fused_reduce": _gfx942_pipeline("a16w16_fused_reduce"),
     "a16w16_kbuf1_large_tile": _gfx942_pipeline("a16w16_kbuf1_large_tile"),
     **{nosplit: _gfx942_pipeline(nosplit) for nosplit in _NOSPLIT},
-    **{splitk: _gfx942_pipeline(nosplit) for nosplit, splitk in W3_KERNEL_PAIRS.items()},
+    **{
+        splitk: _gfx942_pipeline(nosplit) for nosplit, splitk in W3_KERNEL_PAIRS.items()
+    },
 }
-GFX942_PIPELINE_HEADER_MAP = {"a16w16_kbuf1_large_tile": _gfx942_pipeline("a16w16_kbuf1_large_tile")}
+GFX942_PIPELINE_HEADER_MAP = {
+    "a16w16_kbuf1_large_tile": _gfx942_pipeline("a16w16_kbuf1_large_tile")
+}
 
 # Traits header carries the traits struct + kargs struct definitions for a given pipeline tag.
 GFX942_TRAITS_HEADER = "gfx942/opus_gemm_traits_a16w16.cuh"
@@ -88,10 +101,10 @@ V2_SUPPORTED_SPLITKS = (2, 3, 4, 5, 6, 7, 8, 10)
 
 # V3 reduce: (N_VEC, ROWS_PER_BLOCK), BLOCK = N_VEC * ROWS_PER_BLOCK = 64 (1 wave).
 V3_NVEC_ROWS = (
-    (8,  8),   # N=64,  8 rows/wg
-    (16, 4),   # N=128, 4 rows/wg
-    (32, 2),   # N=256, 2 rows/wg
-    (64, 1),   # N=512, 1 row/wg
+    (8, 8),  # N=64,  8 rows/wg
+    (16, 4),  # N=128, 4 rows/wg
+    (32, 2),  # N=256, 2 rows/wg
+    (64, 1),  # N=512, 1 row/wg
 )
 # V4 (8, 32) DEAD 2026-05-30: BLOCK=256 4-wave, 0 wall-time benefit (vmcnt contention).
 
@@ -106,8 +119,8 @@ KERNEL_FUNC_MAP = {
     "a16w16_fused_reduce": "gemm_a16w16_fused_reduce_kernel",
     "a16w16_kbuf1_large_tile": "gemm_a16w16_kbuf1_large_tile_kernel",
     # gfx942 paired tags: nosplit_tag's kernel symbol; splitk_tag reuses it.
-    **{nosplit: f"gemm_{nosplit}_kernel"  for nosplit in W3_KERNEL_PAIRS.keys()},
-    **{splitk:  f"gemm_{nosplit}_kernel"  for nosplit, splitk in W3_KERNEL_PAIRS.items()},
+    **{nosplit: f"gemm_{nosplit}_kernel" for nosplit in W3_KERNEL_PAIRS.keys()},
+    **{splitk: f"gemm_{nosplit}_kernel" for nosplit, splitk in W3_KERNEL_PAIRS.items()},
 }
 
 INPUT_DTYPE_MAP = {
@@ -123,7 +136,9 @@ NOSCALE_TAGS = A16W16_TUNE_TAGS | {"a8w8"}
 
 # Splitk tags forced to <fp32_t> in lookup (main kernel writes fp32 workspace).
 SPLITK_TAGS = {
-    "a16w16_flatmm_splitk", "a16w16_fused_reduce", *_SPLITK,
+    "a16w16_flatmm_splitk",
+    "a16w16_fused_reduce",
+    *_SPLITK,
 }
 
 # gfx942 a16w16 tags all share one traits class name (no arch suffix).
@@ -150,7 +165,7 @@ KARGS_NAME_MAP = {
     "a16w16_persistent": "opus_gemm_persistent_kargs_gfx950",
     "a16w16_mono_tile": "opus_gemm_mono_tile_kargs_gfx950",
     "a16w16_fused_reduce": "opus_gemm_splitk_fused_kargs",
-    **{tag: "opus_gemm_splitk_kargs"  for tag in _SPLITK},
+    **{tag: "opus_gemm_splitk_kargs" for tag in _SPLITK},
     **{tag: "opus_gemm_noscale_kargs" for tag in _NOSPLIT},
 }
 GFX942_KARGS_NAME_MAP = {"a16w16_kbuf1_large_tile": "opus_gemm_noscale_kargs"}
@@ -180,8 +195,12 @@ _INSTANCE_IMPL_PREAMBLE_TEMPLATE = """// SPDX-License-Identifier: MIT
 #include <optional>
 #endif"""
 
+
 def instance_impl_preamble(extra_host_includes=""):
-    return _INSTANCE_IMPL_PREAMBLE_TEMPLATE.format(extra_host_includes=extra_host_includes)
+    return _INSTANCE_IMPL_PREAMBLE_TEMPLATE.format(
+        extra_host_includes=extra_host_includes
+    )
+
 
 # Fused host TU sees only traits header + fwd decl; avoids layout-helper ODR clash.
 _INSTANCE_IMPL_HOST_TU_SPLIT_TEMPLATE = """#ifdef OPUS_FUSED_HOST_TU
@@ -192,12 +211,21 @@ __global__ void {kernel_func}({fwd_decl_kargs_fnarg} kargs);
 #include "{pipeline_header}"
 #endif"""
 
-def instance_impl_host_tu_split(traits_header, pipeline_header, fwd_decl_kargs_tpl,
-                                 kernel_func, fwd_decl_kargs_fnarg):
+
+def instance_impl_host_tu_split(
+    traits_header,
+    pipeline_header,
+    fwd_decl_kargs_tpl,
+    kernel_func,
+    fwd_decl_kargs_fnarg,
+):
     return _INSTANCE_IMPL_HOST_TU_SPLIT_TEMPLATE.format(
-        traits_header=traits_header, pipeline_header=pipeline_header,
+        traits_header=traits_header,
+        pipeline_header=pipeline_header,
         fwd_decl_kargs_tpl=fwd_decl_kargs_tpl,
-        kernel_func=kernel_func, fwd_decl_kargs_fnarg=fwd_decl_kargs_fnarg)
+        kernel_func=kernel_func,
+        fwd_decl_kargs_fnarg=fwd_decl_kargs_fnarg,
+    )
 
 
 # Launcher signature tails after Y.
@@ -218,22 +246,36 @@ def _make_host_decl(kid_name, dtype, host_extra_params):
     )
 
 
-def _make_device_decl(kid_name, dtype, kernel_func, kargs_name, kargs_explicit_param=""):
+def _make_device_decl(
+    kid_name, dtype, kernel_func, kargs_name, kargs_explicit_param=""
+):
     return (
         f"template __global__ void {kernel_func}<\n"
         f"    {kid_name}_Traits<{dtype}>{kargs_explicit_param}>({kargs_name});\n"
     )
 
 
-def _record_one_instantiation(self_obj, k, kernel_func, kargs_name, host_extra,
-                              kargs_explicit_param=""):
+def _record_one_instantiation(
+    self_obj, k, kernel_func, kargs_name, host_extra, kargs_explicit_param=""
+):
     """Record (host_decl, device_decl) for every (kid, dtype) in k.output_dtypes."""
     for CDtype in k.output_dtypes:
-        self_obj._host_instantiations.append({"kid_name": k.name, "dtype": CDtype,
-            "host_decl": _make_host_decl(k.name, CDtype, host_extra)})
-        self_obj._device_instantiations.append({"kid_name": k.name, "dtype": CDtype,
-            "device_decl": _make_device_decl(k.name, CDtype, kernel_func, kargs_name,
-                                              kargs_explicit_param)})
+        self_obj._host_instantiations.append(
+            {
+                "kid_name": k.name,
+                "dtype": CDtype,
+                "host_decl": _make_host_decl(k.name, CDtype, host_extra),
+            }
+        )
+        self_obj._device_instantiations.append(
+            {
+                "kid_name": k.name,
+                "dtype": CDtype,
+                "device_decl": _make_device_decl(
+                    k.name, CDtype, kernel_func, kargs_name, kargs_explicit_param
+                ),
+            }
+        )
 
 
 WARP_SIZE = 64
@@ -817,7 +859,14 @@ class opus_gemm_codegen:
     # -- Instance generation --
 
     def gen_instance(self, k: OpusGemmInstance):
-        if k.kernel_tag in ("a16w16", "a16w16_kbuf1_large_tile", "a16w16_kbuf2v", "a16w16_kbuf2v_bk128", "a16w16_kbuf3", "a16w16_kbuf1"):
+        if k.kernel_tag in (
+            "a16w16",
+            "a16w16_kbuf1_large_tile",
+            "a16w16_kbuf2v",
+            "a16w16_kbuf2v_bk128",
+            "a16w16_kbuf3",
+            "a16w16_kbuf1",
+        ):
             info = self._validate_a16w16(k)
             print(
                 f"  {k.name}: E=({info['E_M']},{info['E_N']},{info['E_K']})"
@@ -856,7 +905,11 @@ class opus_gemm_codegen:
                 f"comrep=({info['com_rep_m']},{info['com_rep_n']}) "
                 f"LDS={info['lds_bytes'] // 1024}KiB K>={info['min_k']} WG={k.WG_PER_CU}"
             )
-        elif k.kernel_tag in ("a16w16_kbuf3_sk", "a16w16_kbuf1_sk", "a16w16_fused_reduce"):
+        elif k.kernel_tag in (
+            "a16w16_kbuf3_sk",
+            "a16w16_kbuf1_sk",
+            "a16w16_fused_reduce",
+        ):
             # gfx942 splitk: reuse split-barrier per-tile validator.
             info = self._validate_a16w16(k)
             print(
@@ -920,7 +973,12 @@ class opus_gemm_codegen:
                 traits_name,
                 kargs_name,
             )
-        elif k.kernel_tag in ("a16w16_kbuf3_sk", "a16w16_kbuf1_sk", "a16w16_kbuf2v_sk", "a16w16_kbuf2v_bk128_sk"):
+        elif k.kernel_tag in (
+            "a16w16_kbuf3_sk",
+            "a16w16_kbuf1_sk",
+            "a16w16_kbuf2v_sk",
+            "a16w16_kbuf2v_bk128_sk",
+        ):
             self._gen_splitk_gfx942_instance(
                 k,
                 pipeline_header,
@@ -993,8 +1051,12 @@ using {k.name}_Traits = {traits_name}<{k.BLOCK_SIZE},
 
         preamble = instance_impl_preamble()
         host_tu_split = instance_impl_host_tu_split(
-            traits_header, pipeline_header, fwd_decl_kargs_tpl,
-            kernel_func, fwd_decl_kargs_fnarg)
+            traits_header,
+            pipeline_header,
+            fwd_decl_kargs_tpl,
+            kernel_func,
+            fwd_decl_kargs_fnarg,
+        )
         INSTANCE_IMPL = f"""{preamble}
 {host_tu_split}
 {traits_aliases}
@@ -1057,7 +1119,9 @@ void
 """
         Path(os.path.join(self.impl_path, f"{k.name}.cuh")).write_text(INSTANCE_IMPL)
 
-        _record_one_instantiation(self, k, kernel_func, kargs_name, A8W8_SCALE_HOST_EXTRA)
+        _record_one_instantiation(
+            self, k, kernel_func, kargs_name, A8W8_SCALE_HOST_EXTRA
+        )
 
     # Shared host-side bias validation + kargs population.
     BIAS_HOST_VALIDATE = """
@@ -1108,7 +1172,12 @@ void
         is_a16w16_split_barrier = (k.kernel_tag == "a16w16") and not is_gfx942_pre
         # a16w16 / _p1 / _p1_bk128 / _w3 / _legacy share opus_gemm_a16w16_traits<BLOCK, DTYPE, VEC, TILE, WAVE>.
         is_a16w16_traits_with_tile_wave = k.kernel_tag in (
-            "a16w16", "a16w16_kbuf1_large_tile", "a16w16_kbuf2v", "a16w16_kbuf2v_bk128", "a16w16_kbuf3", "a16w16_kbuf1"
+            "a16w16",
+            "a16w16_kbuf1_large_tile",
+            "a16w16_kbuf2v",
+            "a16w16_kbuf2v_bk128",
+            "a16w16_kbuf3",
+            "a16w16_kbuf1",
         )
         traits_extra = ""
         if is_a16w16_traits_with_tile_wave:
@@ -1263,8 +1332,12 @@ using {k.name}_Traits = {traits_name}<{k.BLOCK_SIZE},
         # __HIP_DEVICE_COMPILE__: device pass, any TU.
         preamble = instance_impl_preamble()
         host_tu_split = instance_impl_host_tu_split(
-            traits_header, pipeline_header, fwd_decl_kargs_tpl,
-            kernel_func, fwd_decl_kargs_fnarg)
+            traits_header,
+            pipeline_header,
+            fwd_decl_kargs_tpl,
+            kernel_func,
+            fwd_decl_kargs_fnarg,
+        )
         INSTANCE_IMPL = f"""{preamble}
 {host_tu_split}
 {traits_aliases}
@@ -1452,8 +1525,12 @@ using {k.name}_Traits = {traits_name}<{k.BLOCK_SIZE},
 
         preamble = instance_impl_preamble("\n#include <algorithm>")
         host_tu_split = instance_impl_host_tu_split(
-            traits_header, pipeline_header, fwd_decl_kargs_tpl,
-            kernel_func, fwd_decl_kargs_fnarg)
+            traits_header,
+            pipeline_header,
+            fwd_decl_kargs_tpl,
+            kernel_func,
+            fwd_decl_kargs_fnarg,
+        )
         INSTANCE_IMPL = f"""{preamble}
 {host_tu_split}
 {traits_aliases}
@@ -1503,7 +1580,9 @@ void
         Path(os.path.join(self.impl_path, f"{k.name}.cuh")).write_text(INSTANCE_IMPL)
 
         # See _gen_noscale_instance for how these rows are consumed.
-        _record_one_instantiation(self, k, kernel_func, kargs_name, A16W16_TUNE_HOST_EXTRA)
+        _record_one_instantiation(
+            self, k, kernel_func, kargs_name, A16W16_TUNE_HOST_EXTRA
+        )
 
     def _gen_mono_tile_instance(
         self,
@@ -1723,8 +1802,12 @@ using {k.name}_Traits = {traits_name}<{k.BLOCK_SIZE},
 
         preamble = instance_impl_preamble()
         host_tu_split = instance_impl_host_tu_split(
-            traits_header, pipeline_header, fwd_decl_kargs_tpl,
-            kernel_func, fwd_decl_kargs_fnarg)
+            traits_header,
+            pipeline_header,
+            fwd_decl_kargs_tpl,
+            kernel_func,
+            fwd_decl_kargs_fnarg,
+        )
         INSTANCE_IMPL = f"""{preamble}
 {host_tu_split}
 {traits_aliases}
@@ -1786,7 +1869,9 @@ void
         Path(os.path.join(self.impl_path, f"{k.name}.cuh")).write_text(INSTANCE_IMPL)
 
         # See _gen_noscale_instance for how these rows are consumed.
-        _record_one_instantiation(self, k, kernel_func, kargs_name, A16W16_TUNE_HOST_EXTRA)
+        _record_one_instantiation(
+            self, k, kernel_func, kargs_name, A16W16_TUNE_HOST_EXTRA
+        )
 
     def _gen_flatmm_splitk_instance(
         self,
@@ -1833,8 +1918,12 @@ using {k.name}_Traits = {traits_name}<{k.BLOCK_SIZE},
 
         preamble = instance_impl_preamble()
         host_tu_split = instance_impl_host_tu_split(
-            traits_header, pipeline_header, fwd_decl_kargs_tpl,
-            kernel_func, fwd_decl_kargs_fnarg)
+            traits_header,
+            pipeline_header,
+            fwd_decl_kargs_tpl,
+            kernel_func,
+            fwd_decl_kargs_fnarg,
+        )
         INSTANCE_IMPL = f"""{preamble}
 {host_tu_split}
 {traits_aliases}
@@ -2017,7 +2106,9 @@ void
         Path(os.path.join(self.impl_path, f"{k.name}.cuh")).write_text(INSTANCE_IMPL)
 
         # See _gen_noscale_instance for how these rows are consumed.
-        _record_one_instantiation(self, k, kernel_func, kargs_name, A16W16_TUNE_HOST_EXTRA)
+        _record_one_instantiation(
+            self, k, kernel_func, kargs_name, A16W16_TUNE_HOST_EXTRA
+        )
 
     def _gen_splitk_gfx942_instance(
         self,
@@ -2103,7 +2194,7 @@ using {k.name}_Traits = {traits_name}<{k.BLOCK_SIZE},
     }}}}"""
             reduce_launch = ""  # in-kernel reduce; no separate launch
         else:
-            err_label = "a16w16_kbuf3_sk"
+            err_label = k.kernel_tag
             ws_alloc_extra = ""
             ws_size_var = "ws_bytes"
             flags_block = ""
@@ -2122,7 +2213,8 @@ using {k.name}_Traits = {traits_name}<{k.BLOCK_SIZE},
             )
             # V2 essential for N=64+M%row!=0 (V3 misses); baseline 50-80% slower.
             v2_enabled = k.arch_prefix in SPLITK_REDUCE_FAST_ARCHES
-            v2_prelude = """
+            v2_prelude = (
+                """
     // V2/V3 fast path: split_k static-unroll, no OOB.
     constexpr int V2_VEC = 8;
     constexpr int V2_BS  = 8;
@@ -2134,13 +2226,20 @@ using {k.name}_Traits = {traits_name}<{k.BLOCK_SIZE},
     // Dispatch picks the (N_VEC, ROWS) tuple at runtime; supported set is in
     // V3_NVEC_ROWS (gen_instances.py).
     const int v3_n_vec = N / V2_VEC;
-""" if v2_enabled else ""
+"""
+                if v2_enabled
+                else ""
+            )
 
             def v2_branch(hasbias):
                 if not v2_enabled:
                     return ""
                 hb = "true" if hasbias else "false"
-                bias_arg = "reinterpret_cast<const __bf16*>(ptr_bias_), stride_bias_batch_" if hasbias else "nullptr, 0"
+                bias_arg = (
+                    "reinterpret_cast<const __bf16*>(ptr_bias_), stride_bias_batch_"
+                    if hasbias
+                    else "nullptr, 0"
+                )
                 # V3 branches first; V2 fallback when no V3 (N_VEC, ROWS) tuple matches.
                 branches = []
                 first = True
@@ -2149,7 +2248,8 @@ using {k.name}_Traits = {traits_name}<{k.BLOCK_SIZE},
                     for sk in V2_SUPPORTED_SPLITKS:
                         kw = "if" if first else "else if"
                         first = False
-                        branches.append(f"""            {kw} (v2_align && v3_n_vec == {nvec} && (M % {rows} == 0) && split_k == {sk}) {{{{{{{{
+                        branches.append(
+                            f"""            {kw} (v2_align && v3_n_vec == {nvec} && (M % {rows} == 0) && split_k == {sk}) {{{{{{{{
                 dim3 grid_v3(1, M / {rows}, batch);
                 dim3 block_v3({block_size});
                 splitk_reduce_kernel_v3<{sk}, {nvec}, {rows}, V2_VEC, __bf16, {{hb}}, __bf16>
@@ -2158,16 +2258,21 @@ using {k.name}_Traits = {traits_name}<{k.BLOCK_SIZE},
                         reinterpret_cast<__bf16*>(Y.data_ptr()),
                         M, N, batch, padded_M, padded_N,
                         {{bias_arg}});
-            }}}}}}}}""".format(hb=hb, bias_arg=bias_arg))
+            }}}}}}}}""".format(
+                                hb=hb, bias_arg=bias_arg
+                            )
+                        )
                 for sk in V2_SUPPORTED_SPLITKS:
-                    branches.append(f"""            else if (v2_align && split_k == {sk}) {{{{{{{{
+                    branches.append(
+                        f"""            else if (v2_align && split_k == {sk}) {{{{{{{{
                 splitk_reduce_kernel_v2<{sk}, V2_VEC, V2_BS, __bf16, {{hb}}, __bf16>
                     <<<grid_reduce_v2, block_reduce_v2, 0, stream>>>(
                         reinterpret_cast<const float*>(ptr_workspace_),
                         reinterpret_cast<__bf16*>(Y.data_ptr()),
                         M, N, batch, padded_M, padded_N,
                         {{bias_arg}});
-            }}}}}}}}""".format(hb=hb, bias_arg=bias_arg))
+            }}}}}}}}""".format(hb=hb, bias_arg=bias_arg)
+                    )
                 return "\n".join(branches) + " else "  # falls through to baseline
 
             # Baseline reduce call (V2/V3 fall through here; fp32 always lands here).
@@ -2176,7 +2281,8 @@ using {k.name}_Traits = {traits_name}<{k.BLOCK_SIZE},
                 bias_args = (
                     f"\n{indent}            reinterpret_cast<const {dtype}*>(ptr_bias_),\n"
                     f"{indent}            stride_bias_batch_);"
-                    if hasbias else f"\n{indent}            nullptr, 0);"
+                    if hasbias
+                    else f"\n{indent}            nullptr, 0);"
                 )
                 return (
                     f"{indent}splitk_reduce_kernel<REDUCE_VEC, REDUCE_BS, {dtype}, {hb}, {dtype}, true>\n"
@@ -2186,10 +2292,11 @@ using {k.name}_Traits = {traits_name}<{k.BLOCK_SIZE},
                     f"{indent}        split_k, M, N, batch, padded_M, padded_N,"
                     f"{bias_args}"
                 )
-            bf16_t  = _baseline_call("__bf16", True,  "                ")
-            bf16_f  = _baseline_call("__bf16", False, "                ")
-            fp32_t  = _baseline_call("float",  True,  "            ")
-            fp32_f  = _baseline_call("float",  False, "            ")
+
+            bf16_t = _baseline_call("__bf16", True, "                ")
+            bf16_f = _baseline_call("__bf16", False, "                ")
+            fp32_t = _baseline_call("float", True, "            ")
+            fp32_f = _baseline_call("float", False, "            ")
             reduce_launch = f"""
     constexpr int REDUCE_VEC = 16;
     constexpr int REDUCE_BS  = 64;
@@ -2309,7 +2416,7 @@ void
     // requires loops even per split.
     int total_iters = (K + {k.B_K} - 1) / {k.B_K};
     constexpr int min_iters_per_split = 2;
-    constexpr bool require_even_loops_dbuf2 = {"true" if k.kernel_tag.endswith("_p1") else "false"};
+    constexpr bool require_even_loops_dbuf2 = {"true" if k.kernel_tag in ("a16w16_kbuf2v_sk", "a16w16_kbuf2v_bk128_sk") else "false"};
     while (split_k > 1) {{{{
         int iters_full = (total_iters + split_k - 1) / split_k;
         int last_loops = total_iters - (split_k - 1) * iters_full;
@@ -2390,16 +2497,38 @@ void
         if fused:
             # fused: instantiate both Y dtypes (bf16, float) so runtime dispatch links.
             for CDtype in k.output_dtypes:
-                self._host_instantiations.append({"kid_name": k.name, "dtype": CDtype,
-                    "host_decl": _make_host_decl(k.name, CDtype, A16W16_TUNE_HOST_EXTRA)})
-                self._device_instantiations.append({"kid_name": k.name, "dtype": CDtype,
-                    "device_decl": (
-                        _make_device_decl(k.name, CDtype, kernel_func, kargs_name, ", __bf16")
-                        + _make_device_decl(k.name, CDtype, kernel_func, kargs_name, ", float")
-                    )})
+                self._host_instantiations.append(
+                    {
+                        "kid_name": k.name,
+                        "dtype": CDtype,
+                        "host_decl": _make_host_decl(
+                            k.name, CDtype, A16W16_TUNE_HOST_EXTRA
+                        ),
+                    }
+                )
+                self._device_instantiations.append(
+                    {
+                        "kid_name": k.name,
+                        "dtype": CDtype,
+                        "device_decl": (
+                            _make_device_decl(
+                                k.name, CDtype, kernel_func, kargs_name, ", __bf16"
+                            )
+                            + _make_device_decl(
+                                k.name, CDtype, kernel_func, kargs_name, ", float"
+                            )
+                        ),
+                    }
+                )
         else:
-            _record_one_instantiation(self, k, kernel_func, kargs_name,
-                                       A16W16_TUNE_HOST_EXTRA, kargs_explicit_param)
+            _record_one_instantiation(
+                self,
+                k,
+                kernel_func,
+                kargs_name,
+                A16W16_TUNE_HOST_EXTRA,
+                kargs_explicit_param,
+            )
 
     def gen_lookup_dict(self, kernels_dict):
         """Emit opus_gemm_lookup.h with two (M,N,K)->kernel macros.
@@ -2649,17 +2778,39 @@ void
         host_body = "".join(row["host_decl"] for row in self._host_instantiations)
         # splitk_reduce_kernel is launched directly from each a16w16_flatmm_splitk launcher body, so the
         # fused host TU has to see its dec...
+        # Pick reduce kernel sig: gfx950 uses ws_handle*, gfx942 uses raw float* (matches _emit_splitk_reduce_tu).
+        _archs = set()
+        for row in self._device_instantiations:
+            name = row["kid_name"]
+            if "splitk_fused" in name or "splitk_atomic" in name:
+                continue
+            for ap in ("gfx942", "gfx950"):
+                if f"opus_gemm_{ap}_splitk_" in name:
+                    _archs.add(ap)
+                    break
+            else:
+                if "splitk" in name:
+                    _archs.add("gfx950")
+        _fwd_reduce_arch = "gfx942" if "gfx942" in _archs else "gfx950"
+        if _fwd_reduce_arch == "gfx950":
+            _fwd_ws_decl = (
+                "// Traits header brings in opus_splitk_ws_handle.\n"
+                '#include "gfx950/opus_gemm_traits_a16w16_gfx950.cuh"\n'
+            )
+            _fwd_ws_arg = "const opus_splitk_ws_handle* ws_handle"
+        else:
+            _fwd_ws_decl = ""
+            _fwd_ws_arg = "const float* workspace"
         forward_decls = (
             "// Forward declaration only. Specialisations are instantiated\n"
             "// by every splitk device.cu so the linker always finds at\n"
             "// least one definition (weak symbols dedupe across TUs).\n"
-            "// Traits header brings in opus_splitk_ws_handle.\n"
-            '#include "gfx950/opus_gemm_traits_a16w16_gfx950.cuh"\n'
+            f"{_fwd_ws_decl}"
             "template<int VEC_, int BLOCK_, typename D_OUT,\n"
             "         bool HAS_BIAS_, typename D_BIAS_,\n"
             "         bool HAS_OOB_>\n"
             "__global__ void splitk_reduce_kernel(\n"
-            "    const opus_splitk_ws_handle* ws_handle, D_OUT* c_out,\n"
+            f"    {_fwd_ws_arg}, D_OUT* c_out,\n"
             "    int split_k, int M, int N, int batch,\n"
             "    int padded_M, int padded_N,\n"
             "    const D_BIAS_* bias, int stride_bias_batch);\n"
@@ -2795,6 +2946,12 @@ void
         # otherwise fall back to gfx950.
         reduce_arch = "gfx942" if "gfx942" in present_archs else "gfx950"
         reduce_header = f"{reduce_arch}/splitk_reduce_{reduce_arch}.cuh"
+        # gfx950 reduce uses opus_splitk_ws_handle*; gfx942 uses raw float*.
+        ws_ptr_type = (
+            "const opus_splitk_ws_handle*"
+            if reduce_arch == "gfx950"
+            else "const float*"
+        )
         contents = (
             "// SPDX-License-Identifier: MIT\n"
             "// Copyright (C) 2025-2026, Advanced Micro Devices, Inc. All rights reserved.\n"
@@ -2808,36 +2965,38 @@ void
             "// -D__HIPCC_RTC__ so the host pass is minimal.\n"
             f'#include "{reduce_header}"\n'
             "// HAS_OOB=true variants\n"
-            "template __global__ void splitk_reduce_kernel<16, 64, __bf16, true,  __bf16, true>(\n"
-            "    const opus_splitk_ws_handle*, __bf16*, int, int, int, int, int, int,\n"
-            "    const __bf16*, int);\n"
-            "template __global__ void splitk_reduce_kernel<16, 64, __bf16, false, __bf16, true>(\n"
-            "    const opus_splitk_ws_handle*, __bf16*, int, int, int, int, int, int,\n"
-            "    const __bf16*, int);\n"
-            "template __global__ void splitk_reduce_kernel<16, 64, float,  true,  float,  true>(\n"
-            "    const opus_splitk_ws_handle*, float*,  int, int, int, int, int, int,\n"
-            "    const float*,  int);\n"
-            "template __global__ void splitk_reduce_kernel<16, 64, float,  false, float,  true>(\n"
-            "    const opus_splitk_ws_handle*, float*,  int, int, int, int, int, int,\n"
-            "    const float*,  int);\n"
+            f"template __global__ void splitk_reduce_kernel<16, 64, __bf16, true,  __bf16, true>(\n"
+            f"    {ws_ptr_type}, __bf16*, int, int, int, int, int, int,\n"
+            f"    const __bf16*, int);\n"
+            f"template __global__ void splitk_reduce_kernel<16, 64, __bf16, false, __bf16, true>(\n"
+            f"    {ws_ptr_type}, __bf16*, int, int, int, int, int, int,\n"
+            f"    const __bf16*, int);\n"
+            f"template __global__ void splitk_reduce_kernel<16, 64, float,  true,  float,  true>(\n"
+            f"    {ws_ptr_type}, float*,  int, int, int, int, int, int,\n"
+            f"    const float*,  int);\n"
+            f"template __global__ void splitk_reduce_kernel<16, 64, float,  false, float,  true>(\n"
+            f"    {ws_ptr_type}, float*,  int, int, int, int, int, int,\n"
+            f"    const float*,  int);\n"
             "// HAS_OOB=false variants\n"
-            "template __global__ void splitk_reduce_kernel<16, 64, __bf16, true,  __bf16, false>(\n"
-            "    const opus_splitk_ws_handle*, __bf16*, int, int, int, int, int, int,\n"
-            "    const __bf16*, int);\n"
-            "template __global__ void splitk_reduce_kernel<16, 64, __bf16, false, __bf16, false>(\n"
-            "    const opus_splitk_ws_handle*, __bf16*, int, int, int, int, int, int,\n"
-            "    const __bf16*, int);\n"
-            "template __global__ void splitk_reduce_kernel<16, 64, float,  true,  float,  false>(\n"
-            "    const opus_splitk_ws_handle*, float*,  int, int, int, int, int, int,\n"
-            "    const float*,  int);\n"
-            "template __global__ void splitk_reduce_kernel<16, 64, float,  false, float,  false>(\n"
-            "    const opus_splitk_ws_handle*, float*,  int, int, int, int, int, int,\n"
-            "    const float*,  int);\n"
+            f"template __global__ void splitk_reduce_kernel<16, 64, __bf16, true,  __bf16, false>(\n"
+            f"    {ws_ptr_type}, __bf16*, int, int, int, int, int, int,\n"
+            f"    const __bf16*, int);\n"
+            f"template __global__ void splitk_reduce_kernel<16, 64, __bf16, false, __bf16, false>(\n"
+            f"    {ws_ptr_type}, __bf16*, int, int, int, int, int, int,\n"
+            f"    const __bf16*, int);\n"
+            f"template __global__ void splitk_reduce_kernel<16, 64, float,  true,  float,  false>(\n"
+            f"    {ws_ptr_type}, float*,  int, int, int, int, int, int,\n"
+            f"    const float*,  int);\n"
+            f"template __global__ void splitk_reduce_kernel<16, 64, float,  false, float,  false>(\n"
+            f"    {ws_ptr_type}, float*,  int, int, int, int, int, int,\n"
+            f"    const float*,  int);\n"
         )
 
         # V2 (single-row BS=8) + V3 (multi-row BLOCK=64) instantiations.
         if reduce_arch in SPLITK_REDUCE_FAST_ARCHES:
-            contents += "// V2 (split_k static-unroll, no OOB) instantiations -- gfx942 only\n"
+            contents += (
+                "// V2 (split_k static-unroll, no OOB) instantiations -- gfx942 only\n"
+            )
             for sk in V2_SUPPORTED_SPLITKS:
                 contents += (
                     f"template __global__ void splitk_reduce_kernel_v2<{sk}, 8, 8, __bf16, true,  __bf16>(\n"
@@ -3110,6 +3269,7 @@ if __name__ == "__main__":
         # GPU_ARCHS=native: probe live GPU; skip filter if rocminfo unavailable.
         try:
             from aiter.jit.utils.chip_info import get_gfx_runtime
+
             target_arches = {get_gfx_runtime().lower()}
         except Exception:
             target_arches = None

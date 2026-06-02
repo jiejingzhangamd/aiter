@@ -593,7 +593,7 @@ NON_SPLITK_KIDS = (
     | frozenset(a16w16_persistent_kernels_list_nooob.keys())
     | frozenset(a16w16_persistent_kernels_list_cpol_nooob.keys())
     | frozenset(a16w16_mono_tile_kernels_list.keys())
-    | frozenset(gfx942_nosplit_kernels_list.keys())   # 50000/50001/50002/50003/50011
+    | frozenset(gfx942_nosplit_kernels_list.keys())  # 50000/50001/50002/50003/50011
 )
 
 # Bias-aware kids: gfx950 split-barrier (4..9 + cpol/nooob mirrors) and gfx950

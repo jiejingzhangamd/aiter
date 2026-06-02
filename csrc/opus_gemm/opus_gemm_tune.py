@@ -147,6 +147,22 @@ def candidate_splitK(M: int, N: int, K: int, batch: int, cu_num: int, k_inst):
     for kb in range(1, max_split_k + 1):
         candidates.add(kb)
 
+    # kbuf2v_sk family: launcher requires both iters_full and last_loops even AND >=2.
+    if k_inst.kernel_tag in ("a16w16_kbuf2v_sk", "a16w16_kbuf2v_bk128_sk"):
+        total_iters = (K + k_inst.B_K - 1) // k_inst.B_K
+
+        def _ok_sk(sk):
+            iters_full = (total_iters + sk - 1) // sk
+            last = total_iters - (sk - 1) * iters_full
+            return last >= 2 and iters_full % 2 == 0 and last % 2 == 0
+
+        any_valid = any(_ok_sk(s) for s in range(1, max_split_k + 1))
+        candidates = {
+            sk
+            for sk in candidates
+            if (sk == 0 and any_valid) or (sk >= 1 and _ok_sk(sk))
+        }
+
     return sorted(candidates)
 
 
@@ -181,8 +197,12 @@ def kid_rejects_shape(k_inst, M, N, K):
     loops = _ceil_div(K, B_K)
 
     if k_inst.kernel_tag in (
-        "a16w16", "a16w16_kbuf1_large_tile",
-        "a16w16_kbuf2v", "a16w16_kbuf2v_bk128", "a16w16_kbuf3", "a16w16_kbuf1"
+        "a16w16",
+        "a16w16_kbuf1_large_tile",
+        "a16w16_kbuf2v",
+        "a16w16_kbuf2v_bk128",
+        "a16w16_kbuf3",
+        "a16w16_kbuf1",
     ):
         # Non-splitK a16w16 family all share the same (loops-2)%2==0 K-dbuf parity + mfma layout
         # constraints as a16w16 (50000).
@@ -217,9 +237,18 @@ def kid_rejects_shape(k_inst, M, N, K):
         per_slice_bytes = 1 * padded_M * padded_N * 4  # batch=1 in tune path
         if per_slice_bytes > UINT32_MAX_BYTES:
             return True
-        # Reject if even the smallest non-trivial split_k=1 workspace (= 1 slice) overflows;
-        # candidate_splitK clamps higher split_k again...
         return False
+
+    # kbuf2v_sk family: launcher requires loops_per_split (both full and last) even AND >=2.
+    if k_inst.kernel_tag in ("a16w16_kbuf2v_sk", "a16w16_kbuf2v_bk128_sk"):
+        total_iters = _ceil_div(K, B_K)
+        max_sk = max(1, min(16, total_iters // max(_flatmm_splitk_pfk(k_inst), 1)))
+        for sk in range(1, max_sk + 1):
+            iters_full = _ceil_div(total_iters, sk)
+            last = total_iters - (sk - 1) * iters_full
+            if last >= 2 and iters_full % 2 == 0 and last % 2 == 0:
+                return False
+        return True
 
     if k_inst.kernel_tag == "a16w16_persistent":
         if loops < 2 or (loops % 2 != 0):
@@ -341,15 +370,28 @@ def candidate_kids_for_shape(M, N, K, bias, cu_num):
     try:
         from aiter.jit.utils.chip_info import get_gfx_runtime
         from opus_gemm_common import kernels_list as _klist
+
         _run_arch = get_gfx_runtime().lower()
         cands = frozenset(
-            kid for kid in cands
+            kid
+            for kid in cands
             if (getattr(_klist.get(kid), "arch_prefix", "") or "gfx950").lower()
             == _run_arch
         )
     except Exception:
         pass  # unknown arch -> keep legacy multi-arch behaviour
+
+    # Step 6: drop known-bad kids permanently (silent garbage; see PLAN.md G2/G3).
+    cands = cands - _OPUS_PERMA_BAD_KIDS
     return cands
+
+
+# Kids we never want tuner to probe (correctness FAIL on multiple shape niches).
+# See plan PLAN.md G2: 50300 fused_reduce 49% splitK case FAIL on 1024x64x7168
+# (memory [[opus-50300-silent-garbage]]). Kept in source + heuristic-default
+# (so opus_gemm_a16w16_tune(id=50300) debug path still works) but excluded
+# from tune candidate search.
+_OPUS_PERMA_BAD_KIDS = frozenset({50300})
 
 
 def _ensure_kids_compiled(candidate_kids):
@@ -415,6 +457,7 @@ def _ensure_kids_compiled(candidate_kids):
     # Restrict the heuristic-default kid set to the running GPU's arch.
     try:
         from aiter.jit.utils.chip_info import get_gfx_runtime
+
         _run_arch = get_gfx_runtime().lower()
         _heuristic = heuristic_kids_for_arch({_run_arch})
     except Exception:
@@ -618,9 +661,11 @@ a16w16_all_kernels = {
 # non-empty implementation on the run...
 try:
     from aiter.jit.utils.chip_info import get_gfx_runtime
+
     _run_arch = get_gfx_runtime().lower()
     a16w16_kernel_ids = sorted(
-        kid for kid, k in a16w16_all_kernels.items()
+        kid
+        for kid, k in a16w16_all_kernels.items()
         if (getattr(k, "arch_prefix", "") or "gfx950").lower() == _run_arch
     )
 except Exception:
