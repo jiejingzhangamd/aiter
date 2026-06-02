@@ -49,10 +49,9 @@ def gemm_a8w8_ck(
     splitK: int = 0,
 ) -> torch.Tensor: ...
 
-
 @compile_ops(
-    "module_gemm_a8w8_tune",
-    fc_name="gemm_a8w8_tune",
+    "module_gemm_a8w8_cktile",
+    fc_name="gemm_a8w8_cktile",
     gen_fake=gen_gemm_a8w8_ck_fake_tensors,
 )
 def gemm_a8w8_cktile(
@@ -869,7 +868,7 @@ def gemm_a8w8_tune(
 
 @compile_ops(
     "module_gemm_a8w8_cktile_tune",
-    fc_name="module_gemm_a8w8_cktile_tune",
+    fc_name="gemm_a8w8_cktile_tune",
     gen_fake=gen_gemm_a8w8_tune_fake_tensors,
 )
 def gemm_a8w8_cktile_tune(

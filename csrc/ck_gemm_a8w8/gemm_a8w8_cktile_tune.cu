@@ -53,7 +53,7 @@ RowwiseKernel rowwise_dispatch(int id)
 }
 
 
-torch::Tensor gemm_a8w8_tune(
+torch::Tensor gemm_a8w8_cktile_tune(
     torch::Tensor &XQ,
     torch::Tensor &WQ,
     torch::Tensor &x_scale,
@@ -62,8 +62,6 @@ torch::Tensor gemm_a8w8_tune(
     int kernelId,
     int splitK)
 {
-  TORCH_CHECK(false, "At least something");
-
   TORCH_CHECK(XQ.dtype() == WQ.dtype(),
               "XQ and WQ should have the same dtype!");
   TORCH_CHECK(x_scale.dtype() == w_scale.dtype(),
